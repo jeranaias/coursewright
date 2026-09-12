@@ -9,6 +9,16 @@ const DIAG = process.env.COURSEWRIGHT_DIAGRAM_MODEL || 'google/gemini-3.1-pro-pr
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const GROUND = 'Use ONLY the provided source passage; every claim must be supported by it. If unsupported, output {"refused":true,"reason":"..."}.';
 
+/**
+ * True when a model response cannot ground a lesson — an explicit refusal, a request error,
+ * or empty content. Used to skip the rest of a section instead of emitting empty artifacts.
+ * @param {object} resp Parsed model response.
+ * @returns {boolean}
+ */
+export function isRefusal(resp) {
+  return !resp || resp.refused === true || !!resp.error || !resp.lesson;
+}
+
 async function ask(model, system, user, tries = 4, timeoutMs = 90000) {
   const KEY = process.env.COURSEWRIGHT_API_KEY || process.env.OPENROUTER_API_KEY;
   if (!KEY) return { error: 'set COURSEWRIGHT_API_KEY (or OPENROUTER_API_KEY)' };
@@ -37,8 +47,17 @@ async function genSection(obj, opts, emit) {
   const src = `Source passage:\n"${obj.passage}"\n${obj.cite ? 'Citation: ' + obj.cite : ''}\nObjective: ${obj.objective}`;
   const section = { title: obj.title || obj.objective, cite: obj.cite || null };
 
-  const lesson = await ask(TEXT, `You are an instructor writing a micro-lesson. Doctrinal FACTS must come ONLY from the passage — never invent standards or numbers not present. You MAY add brief framing (why it matters, one coaching cue) consistent with the passage. If unsupported, output {"refused":true,"reason":"..."}. Output JSON only: {"refused":false,"lesson":"<4-7 sentences: the concept and why it matters; the most common error and how to correct it; a coaching cue>"}`, `${src}\nWrite the micro-lesson.`);
-  if (lesson.lesson) { section.lesson = lesson.lesson; emit?.({ ok: true, kind: 'lesson', section: section.title }); }
+  const lesson = await ask(TEXT, `You are an instructor writing a micro-lesson. Factual claims must come ONLY from the passage — never invent standards or numbers not present. You MAY add brief framing (why it matters, one coaching cue) consistent with the passage. If unsupported, output {"refused":true,"reason":"..."}. Output JSON only: {"refused":false,"lesson":"<4-7 sentences: the concept and why it matters; the most common error and how to correct it; a coaching cue>"}`, `${src}\nWrite the micro-lesson.`);
+  // If the passage can't ground the lesson, mark the section and skip the rest — the diagram,
+  // tests, and flashcards would refuse too, so there's no point spending the calls.
+  if (isRefusal(lesson)) {
+    section.refused = true;
+    section.reason = lesson?.reason || (lesson?.error ? `lesson unavailable (${lesson.error})` : 'not supported by the provided passage');
+    emit?.({ ok: false, kind: 'lesson', section: section.title });
+    return section;
+  }
+  section.lesson = lesson.lesson;
+  emit?.({ ok: true, kind: 'lesson', section: section.title });
 
   if (opts.diagrams !== false) {
     const d = await ask(DIAG, `${GROUND} You are a technical diagram author. Output JSON only: {"refused":false,"title":"...","viewBox":"0 0 340 200","elements":[...]}. Types: circle{type,cx,cy,r,stroke,fill}; rect{type,x,y,w,h,fill,stroke}; line{type,x1,y1,x2,y2,stroke}; text{type,x,y,text}. Include a label for each key part. Colors MUST be one of "dim","glow","glow2","danger","readout","none".`, `${src}\nProduce a labeled schematic diagram for a learner.`, 4, 120000);
@@ -74,11 +93,15 @@ async function genApply(objectives, title, emit) {
 
 /**
  * Build a course from objectives that each carry a grounding passage.
- * @param {{ title?: string, objectives: {objective:string, passage:string, cite?:string, title?:string}[] }} spec
- * @param {(evt:object)=>void} [emit] progress callback
- * @returns course JSON: { title, sections:[…], scenario, discussion, summary }
+ * @param {{ title?: string, diagrams?: boolean, objectives?: {objective:string, passage:string, cite?:string, title?:string}[] }} spec
+ *   Course title and the objectives to teach. Each objective supplies the `passage` that grounds it.
+ * @param {(evt:object)=>void} [emit] Progress callback; fired as each artifact lands.
+ * @returns {Promise<object>} Course JSON: `{ title, sections:[…], scenario?, discussion?, summary? }`.
+ *   A section whose passage can't ground it comes back as `{ title, cite, refused:true, reason }`.
  */
 export async function buildCourse(spec, emit) {
+  if (!spec || typeof spec !== 'object') throw new TypeError('buildCourse(spec): spec must be an object');
+  if (spec.objectives != null && !Array.isArray(spec.objectives)) throw new TypeError('buildCourse(spec): spec.objectives must be an array');
   const title = spec.title || 'Generated Course';
   const objectives = spec.objectives || [];
   const sections = [];
@@ -94,9 +117,12 @@ export async function buildCourse(spec, emit) {
 /**
  * Build a course straight from raw documents: chunk them, retrieve the best passage per objective,
  * then generate. Objectives whose topic isn't covered by the documents are skipped (never invented).
- * @param {{ title?: string, objectives: (string|{objective,title?})[], documents: (string|{text,source?})[], diagrams?: boolean }} spec
+ * @param {{ title?: string, objectives?: (string|{objective:string,title?:string})[], documents?: (string|{text:string,source?:string})[], diagrams?: boolean }} spec
+ * @param {(evt:object)=>void} [emit] Progress callback; also fires `{ step:'skipped', section }` per uncovered objective.
+ * @returns {Promise<object>} Course JSON, same shape as {@link buildCourse}.
  */
 export async function fromDocuments(spec, emit) {
+  if (!spec || typeof spec !== 'object') throw new TypeError('fromDocuments(spec): spec must be an object');
   const chunks = chunk(spec.documents || []);
   const objectives = [];
   for (const o of (spec.objectives || [])) {

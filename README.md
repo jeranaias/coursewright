@@ -10,7 +10,8 @@ post-test, and flashcards for every objective, then a capstone applied **scenari
 higher-order **discussion prompts**, and an **instructor summary**.
 
 Every fact comes from the passage you supplied. If a passage doesn't support an objective, that piece
-refuses instead of inventing — so the whole course stays defensible.
+refuses instead of inventing — so the whole course stays defensible. A section whose passage can't
+ground it comes back as `{ "title": "…", "refused": true, "reason": "…" }` rather than a fabricated lesson.
 
 It returns plain JSON. No database, no server, no framework.
 

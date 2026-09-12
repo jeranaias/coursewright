@@ -1,5 +1,5 @@
 // COURSEWRIGHT_API_KEY=... node example/demo.mjs
-import { buildCourse } from '../src/coursewright.js';
+import { buildCourse } from '../src/index.js';
 const course = await buildCourse({
   title: 'Rifle Marksmanship Fundamentals',
   diagrams: false, // set true to also draft diagrams (uses a stronger model)
