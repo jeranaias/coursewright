@@ -1,0 +1,10 @@
+{
+  "name": "coursewright",
+  "version": "0.1.0",
+  "description": "Generate a complete, cited course from objectives and your own source documents.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "src/coursewright.js",
+  "exports": { ".": "./src/coursewright.js" },
+  "keywords": ["course-generation", "instructional-design", "grounded", "cite-or-refuse", "elearning", "llm"]
+}
