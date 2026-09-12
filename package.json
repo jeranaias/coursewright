@@ -5,6 +5,18 @@
   "license": "Apache-2.0",
   "type": "module",
   "main": "src/coursewright.js",
-  "exports": { ".": "./src/coursewright.js" },
-  "keywords": ["course-generation", "instructional-design", "grounded", "cite-or-refuse", "elearning", "llm"]
+  "exports": {
+    ".": "./src/coursewright.js"
+  },
+  "keywords": [
+    "course-generation",
+    "instructional-design",
+    "grounded",
+    "cite-or-refuse",
+    "elearning",
+    "llm"
+  ],
+  "scripts": {
+    "test": "node --test"
+  }
 }

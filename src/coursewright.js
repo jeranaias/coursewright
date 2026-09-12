@@ -2,6 +2,7 @@
 // Each objective carries a grounding passage; Coursewright writes a micro-lesson, a labeled diagram,
 // pre/post checks, and flashcards for it — cite-or-refuse throughout — then a capstone scenario with
 // coaching, discussion prompts, and an instructor summary. Returns plain JSON. No database required.
+import { chunk, match } from './retrieve.js';
 const ENDPOINT = process.env.COURSEWRIGHT_ENDPOINT || 'https://openrouter.ai/api/v1/chat/completions';
 const TEXT = process.env.COURSEWRIGHT_MODEL || 'google/gemini-3-flash-preview';
 const DIAG = process.env.COURSEWRIGHT_DIAGRAM_MODEL || 'google/gemini-3.1-pro-preview';
@@ -89,3 +90,22 @@ export async function buildCourse(spec, emit) {
   emit?.({ step: 'done' });
   return { title, sections, ...apply };
 }
+
+/**
+ * Build a course straight from raw documents: chunk them, retrieve the best passage per objective,
+ * then generate. Objectives whose topic isn't covered by the documents are skipped (never invented).
+ * @param {{ title?: string, objectives: (string|{objective,title?})[], documents: (string|{text,source?})[], diagrams?: boolean }} spec
+ */
+export async function fromDocuments(spec, emit) {
+  const chunks = chunk(spec.documents || []);
+  const objectives = [];
+  for (const o of (spec.objectives || [])) {
+    const objective = typeof o === 'string' ? o : o.objective;
+    const hit = match(objective, chunks);
+    if (!hit) { emit?.({ step: 'skipped', section: objective }); continue; } // not covered by the sources
+    objectives.push({ objective, title: (typeof o === 'object' && o.title) || objective, passage: hit.text, cite: hit.source || null });
+  }
+  return buildCourse({ title: spec.title, objectives, diagrams: spec.diagrams }, emit);
+}
+
+export { chunk, match } from './retrieve.js';

@@ -63,6 +63,23 @@ const course = await buildCourse({
 > **Where do passages come from?** Anywhere — your own retrieval, a search index, or hand-picked
 > excerpts. Coursewright only asks that each objective arrive with the text that grounds it.
 
+## Or: straight from raw documents
+
+Don't want to pre-pick passages? Hand Coursewright the documents and the objectives, and it chunks,
+retrieves the best passage per objective, and generates — skipping any objective the documents don't
+actually cover (never inventing one):
+
+```js
+import { fromDocuments } from 'coursewright';
+
+const course = await fromDocuments({
+  title: 'Rifle Marksmanship Fundamentals',
+  objectives: ['Explain trigger control and follow-through.', 'Explain natural point of aim.'],
+  documents: [{ text: fullManualText, source: 'Marksmanship' }],
+});
+// objectives not covered by the documents are skipped, not faked
+```
+
 ## Watch it build
 
 Pass a second `emit` callback to stream progress as each artifact lands — handy for a long run or a
