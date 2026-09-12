@@ -1,3 +1,3 @@
 // Public entry point for Coursewright.
-// Re-exports the course generators and the retrieval helpers.
-export { buildCourse, fromDocuments, chunk, match } from './coursewright.js';
+// Re-exports the course generators, the grounding checks, and the retrieval helpers.
+export { buildCourse, fromDocuments, isRefusal, verifyGrounding, chunk, match } from './coursewright.js';

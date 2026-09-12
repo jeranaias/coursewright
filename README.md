@@ -9,9 +9,14 @@ builds the whole course: a micro-lesson, an optional labeled diagram, a pre-test
 post-test, and flashcards for every objective, then a capstone applied **scenario with coaching**,
 higher-order **discussion prompts**, and an **instructor summary**.
 
-Every fact comes from the passage you supplied. If a passage doesn't support an objective, that piece
-refuses instead of inventing — so the whole course stays defensible. A section whose passage can't
-ground it comes back as `{ "title": "…", "refused": true, "reason": "…" }` rather than a fabricated lesson.
+Every fact comes from the passage you supplied — and that's **enforced mechanically**, not just asked
+of the model. Every artifact (lesson, diagram labels, test questions, flashcards, scenario, discussion,
+summary) is checked for token overlap against its source passage before it ships, so a fabricated
+standard or number the model returned with `refused:false` is still rejected. If a passage doesn't
+support an objective, that piece refuses instead of inventing — so the whole course stays defensible.
+
+- A **section** whose passage can't ground its lesson comes back as `{ "title": "…", "refused": true, "reason": "…" }` rather than a fabricated lesson.
+- An **individual artifact** that can't be grounded (say the diagram, but the lesson held) is dropped and its reason recorded under `section.refusals`, e.g. `{ "diagram": "diagram labels not grounded in the passage" }`.
 
 It returns plain JSON. No database, no server, no framework.
 
@@ -40,7 +45,8 @@ const course = await buildCourse({
       "pre":  [{ "stem": "…", "options": ["…"], "answer": 0 }],
       "post": [{ "stem": "…", "options": ["…"], "answer": 2 }],
       "flashcards": [{ "front": "…", "back": "…" }],
-      "diagram": { "title": "…", "elements": [ … ] } }
+      "diagram": { "title": "…", "elements": [ … ] },
+      "refusals": {} }        // per-artifact refusal reasons, e.g. { "diagram": "…" }; empty when all held
   ],
   "scenario":   { "situation": "…", "task": "…", "coaching": "… [1]" },
   "discussion": ["…", "…", "…"],
@@ -90,6 +96,39 @@ live UI.
 
 ```js
 await buildCourse(spec, (e) => console.log(e.step || e.kind, e.ok === false ? '(refused)' : ''));
+```
+
+## Check grounding yourself
+
+The same mechanical check Coursewright gates every artifact on is exported. `verifyGrounding(text, passage)`
+returns the fraction of the text's content words that appear in the passage, and whether that clears the
+threshold (default `0.4`). It's pure and deterministic — no model, no network.
+
+```js
+import { verifyGrounding, isRefusal } from 'coursewright';
+
+const passage = 'Trigger control is a smooth, consistent rearward squeeze of the trigger while maintaining aim and stabilization until the bullet leaves the muzzle.';
+
+verifyGrounding('a smooth rearward squeeze of the trigger until the bullet leaves the muzzle', passage);
+// → { grounded: true, overlap: 1, matched: 8, total: 8 }
+
+verifyGrounding('The rifle fires a 5.56mm cartridge at 940 m/s per NATO standard.', passage);
+// → { grounded: false, overlap: 0, … }   ← fabricated numbers don't appear in the passage
+
+isRefusal({ refused: true, reason: 'unsupported' }); // → true
+```
+
+## Test without a live endpoint
+
+`buildCourse` and `fromDocuments` take a third `options` argument. Inject an `ask` (or a `fetch`
+override) to drive the whole generation path deterministically — no API key, no network:
+
+```js
+const ask = async (model, system, user) =>
+  /micro-lesson/.test(user) ? { refused: false, lesson: passage + ' Why it matters: …' }
+  : { refused: false, items: [], cards: [] };
+
+const course = await buildCourse(spec, null, { ask });
 ```
 
 ## Bring your own model
