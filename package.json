@@ -18,5 +18,19 @@
   ],
   "scripts": {
     "test": "node --test"
-  }
+  },
+  "author": "jeranaias",
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jeranaias/coursewright.git"
+  },
+  "homepage": "https://github.com/jeranaias/coursewright#readme",
+  "bugs": "https://github.com/jeranaias/coursewright/issues",
+  "files": [
+    "src",
+    "example"
+  ]
 }

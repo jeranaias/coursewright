@@ -1,5 +1,7 @@
 # 📐 Coursewright
 
+[![CI](https://github.com/jeranaias/coursewright/actions/workflows/ci.yml/badge.svg)](https://github.com/jeranaias/coursewright/actions/workflows/ci.yml) [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+
 **Generate a complete, cited course from objectives and your own source documents.**
 
 Hand Coursewright a set of learning objectives — each paired with the passage that grounds it — and it
